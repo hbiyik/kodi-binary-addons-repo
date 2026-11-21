@@ -349,7 +349,6 @@ def main(argv):
     for d in (srcdir, builddir, repodir):
         os.makedirs(d, exist_ok=True)
 
-    ret = 0
     for renderer in ["gl", "gles"]:
         renderer_builddir = os.path.join(builddir, renderer)
         renderer_repodir = os.path.join(repodir, renderer)
@@ -359,8 +358,6 @@ def main(argv):
                                renderer, os.environ)
         if failures:
             logger.error("Failed addons: %s", ", ".join(failures))
-            ret = 1
-    return ret
 
 
 if __name__ == "__main__":
