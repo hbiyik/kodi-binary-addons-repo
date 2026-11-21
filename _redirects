@@ -1,0 +1,2 @@
+/:tag/:addonid/:file  https://github.com/hbiyik/kodi-binary-addons-repo/releases/download/:tag/:file  302
+/:tag/:file           https://github.com/hbiyik/kodi-binary-addons-repo/releases/download/:tag/:file  302

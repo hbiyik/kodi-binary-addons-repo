@@ -15,6 +15,7 @@
  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
+import argparse
 import json
 import sys
 import os
@@ -24,6 +25,8 @@ import shutil
 import multiprocessing
 import zipfile
 import hashlib
+from urllib.parse import urlparse
+from urllib.request import urlopen, Request
 
 import xml.etree.ElementTree as ET
 
@@ -44,6 +47,85 @@ logging.basicConfig(
     level=logging.INFO,
 )
 logger = logging.getLogger(__name__)
+
+
+def github_error(message, title=None):
+    """Emit a GitHub Actions workflow command error annotation when running in CI."""
+    if os.environ.get("GITHUB_ACTIONS") != "true":
+        return
+
+    escaped = (
+        str(message)
+        .replace("%", "%25")
+        .replace("\r", "%0D")
+        .replace("\n", "%0A")
+    )
+
+    if title:
+        escaped_title = (
+            str(title)
+            .replace("%", "%25")
+            .replace("\r", "%0D")
+            .replace("\n", "%0A")
+            .replace(":", "%3A")
+            .replace(",", "%2C")
+        )
+        print(f"::error title={escaped_title}::{escaped}", flush=True)
+    else:
+        print(f"::error::{escaped}", flush=True)
+
+
+def write_step_summary(markdown):
+    """Append Markdown content to $GITHUB_STEP_SUMMARY when running in CI."""
+    summary_path = os.environ.get("GITHUB_STEP_SUMMARY")
+    if not summary_path:
+        return
+    try:
+        with open(summary_path, "a", encoding="utf-8") as fp:
+            fp.write(markdown)
+    except OSError as e:
+        logger.warning("Failed to write step summary to %s: %s", summary_path, e)
+
+
+def render_build_summary(config_name, renderer, kodirev, kodihash, results):
+    """Format per-addon build/packaging outcomes as a Markdown step summary."""
+    ordered_results = sorted(results, key=lambda item: 0 if item["status"] == "Failed" else 1)
+    failed = [item["name"] for item in ordered_results if item["status"] == "Failed"]
+
+    lines = [
+        f"### Build Summary: `{config_name}` (`{renderer}`)",
+        "",
+        f"Kodi ref: `{kodirev}.{kodihash}`",
+        "",
+    ]
+
+    if failed:
+        failed_list = ", ".join(f"`{str(name).replace('`', '')}`" for name in failed)
+        lines.extend([
+            "> [!CAUTION]",
+            f"> **{len(failed)} add-on(s) failed:** {failed_list}",
+            "",
+        ])
+
+    lines.extend([
+        "| Add-on | Version | Status | Details |",
+        "| :--- | :--- | :--- | :--- |",
+    ])
+
+    for item in ordered_results:
+        addon_id = str(item["name"]).replace("|", "\\|")
+        version = str(item["version"]).replace("|", "\\|")
+        raw_status = str(item["status"])
+        status_label = (
+            f"🔴 **{raw_status.replace('|', '\\|')}**"
+            if raw_status == "Failed"
+            else raw_status.replace("|", "\\|")
+        )
+        details = str(item["details"]).replace("|", "\\|")
+        lines.append(f"| `{addon_id}` | `{version}` | {status_label} | {details} |")
+
+    lines.append("")
+    return "\n".join(lines) + "\n"
 
 
 def loadconfig(path):
@@ -107,6 +189,39 @@ def run_cmd(*cmd, cwd=None, exitonerror=True, capture=False, env=None):
         return e.returncode, ""
 
 
+def download_depends(urls, download_dir):
+    """Download each URL in urls into download_dir. Returns True on success."""
+    if not urls:
+        return True
+    if not isinstance(urls, list):
+        logger.error("'depends' must be a list of URLs, got %s", type(urls).__name__)
+        return False
+
+    os.makedirs(download_dir, exist_ok=True)
+    for url in urls:
+        filename = os.path.basename(urlparse(url).path)
+        if not filename:
+            logger.error("Cannot determine filename from dependency URL: %s", url)
+            return False
+        dest_path = os.path.join(download_dir, filename)
+        tmp_path = dest_path + ".part"
+        logger.info("Downloading dependency %s -> %s", url, dest_path)
+        try:
+            req = Request(url, headers={"User-Agent": "Mozilla/5.0"})
+            with urlopen(req, timeout=60) as resp, open(tmp_path, "wb") as out:
+                shutil.copyfileobj(resp, out)
+            os.replace(tmp_path, dest_path)
+        except Exception as e:
+            logger.error("Failed to download dependency %s: %s", url, e)
+            try:
+                if os.path.exists(tmp_path):
+                    os.remove(tmp_path)
+            except OSError:
+                pass
+            return False
+    return True
+
+
 def checkout(srcdir, name, url, ref, commit=None):
     target_dir = os.path.join(srcdir, name)
     os.makedirs(target_dir, exist_ok=True)
@@ -143,9 +258,11 @@ def checkout(srcdir, name, url, ref, commit=None):
     old_count = count_commits()
     old_hash = old_hash[:GITHASHLEN]
 
-    # Works for branches, tags and (where the server allows it) commit hashes.
-    git("fetch", "-q", "origin", commit or ref)
-    git("reset", "-q", "--hard", "FETCH_HEAD")
+    git("fetch", "-q", "origin", ref)
+    if commit:
+        git("reset", "-q", "--hard", commit)
+    else:
+        git("reset", "-q", "--hard", "FETCH_HEAD")
 
     _, final_hash = git("rev-parse", "HEAD", capture=True)
     final_count = count_commits()
@@ -272,14 +389,15 @@ def updaterepoaddon(repodir, builddir, addonname, kodirev, kodihash, addonrev, a
     return packaged
 
 
-def buildaddon(srcdir, builddir, repodir, kodirev, kodihash, addon, env):
+def buildaddon(srcdir, builddir, repodir, kodirev, kodihash, addon, renderer, env, cmake):
     addonenv = env.copy()
     addonenv.update(addon.get("env", {}))
+    cmake.extend(addon.get("cmake", []))
     addonname = addon["name"]
     addonhash, addonrev = checkout(srcdir, addonname, addon["url"], addon["ref"], addon.get("commit"))
     newver = (kodirev, addonrev, kodihash, addonhash)
 
-    existing = existingversions(repodir, addonname)
+    existing = existingversions(repodir, addon.get("subname") or addonname)
     if newver in existing:
         logger.info("%s has no update, skipping", addonname)
         return SKIPPED, addonrev, addonhash
@@ -289,14 +407,23 @@ def buildaddon(srcdir, builddir, repodir, kodirev, kodihash, addon, env):
     addon_builddir = os.path.join(builddir, addonname)
     shutil.rmtree(addon_builddir, ignore_errors=True)
     os.makedirs(addon_builddir, exist_ok=True)
+
+    depends = addon.get("depends")
+    if depends:
+        download_dir = os.path.join(addon_builddir, "build", "download")
+        if not download_depends(depends, download_dir):
+            logger.error("Failed to download dependencies for addon %s", addonname)
+            return FAILED, addonrev, addonhash
+
     cmake_cmd = [
         "cmake",
         f"-DADDONS_TO_BUILD={addonname}",
         f"-DADDON_SRC_PREFIX={srcdir}",
         "-DCMAKE_BUILD_TYPE=Release",
-        "-DAPP_RENDER_SYSTEM=gles",
+        f"-DAPP_RENDER_SYSTEM={renderer}",
         f"-DCMAKE_INSTALL_PREFIX={addon_builddir}/.install",
         "-DPACKAGE_ZIP=ON",
+        *cmake,
         "-Wno-dev",
         f"{srcdir}/kodi/cmake/addons",
     ]
@@ -312,33 +439,87 @@ def buildaddon(srcdir, builddir, repodir, kodirev, kodihash, addon, env):
     return BUILT, addonrev, addonhash
 
 
-def buildaddons(config, srcdir, builddir, repodir, env):
+def buildaddons(config, srcdir, builddir, repodir, renderer, env):
     kodihash, kodirev = checkout(srcdir, KODI, config[KODI]["url"], config[KODI]["ref"],
                                  config[KODI].get("commit"))
     kodienv = env.copy()
     kodienv.update(config[KODI].get("env", {}))
+    cmake = config[KODI].get("cmake", [])
     failures = []
+    results = []
     for addon in config[ADDONS]:
         name = addon["name"]
         state, addonrev, addonhash = buildaddon(
-            srcdir, builddir, repodir, kodirev, kodihash, addon, kodienv)
+            srcdir, builddir, repodir, kodirev, kodihash, addon, renderer, kodienv, cmake)
+        ver_str = f"{kodirev}.{addonrev}.{kodihash}.{addonhash}"
+
         if state == SKIPPED:
+            results.append({
+                "name": name,
+                "version": ver_str,
+                "status": "Skipped",
+                "details": "Up to date in repository",
+            })
             continue
+
         if state == FAILED:
             failures.append(name)
+            github_error(
+                f"Failed to build '{name}' for renderer '{renderer}' ({ver_str}).",
+                title=f"Build Failed: {name} [{renderer}]",
+            )
+            results.append({
+                "name": name,
+                "version": ver_str,
+                "status": "Failed",
+                "details": f"Build failed ({renderer})",
+            })
             continue
-        if not updaterepoaddon(repodir, builddir, name, kodirev, kodihash,
-                               addonrev, addonhash):
+
+        packaged = updaterepoaddon(repodir, builddir, name, kodirev, kodihash,
+                                   addonrev, addonhash)
+        if not packaged:
             failures.append(name)
+            github_error(
+                f"Failed to package or update repo metadata for '{name}' on renderer '{renderer}'.",
+                title=f"Packaging Failed: {name} [{renderer}]",
+            )
+            results.append({
+                "name": name,
+                "version": ver_str,
+                "status": "Failed",
+                "details": f"Packaging failed ({renderer})",
+            })
+            continue
+
+        results.append({
+            "name": name,
+            "version": ver_str,
+            "status": "Built",
+            "details": f"Packaged {packaged} archive(s) ({renderer})",
+        })
+
+    write_step_summary(
+        render_build_summary(config["name"], renderer, kodirev, kodihash, results)
+    )
     return failures
 
 
-def main(argv):
-    if len(argv) != 2:
-        print(f"Usage: {argv[0]} <config.json>", file=sys.stderr)
-        return 2
+def parse_args(argv):
+    parser = argparse.ArgumentParser(description="Build Kodi binary add-ons.")
+    parser.add_argument("config", help="Path to the build JSON configuration file")
+    parser.add_argument(
+        "-r",
+        "--renderer",
+        default="gl",
+        help="Target renderer (default: gl)",
+    )
+    return parser.parse_args(argv)
 
-    config = loadconfig(argv[1])
+
+def main(argv):
+    args = parse_args(argv)
+    config = loadconfig(args.config)
 
     basedir = config["name"]
     srcdir = os.path.abspath(os.path.join(basedir, "src"))
@@ -347,12 +528,18 @@ def main(argv):
     for d in (srcdir, builddir, repodir):
         os.makedirs(d, exist_ok=True)
 
-    failures = buildaddons(config, srcdir, builddir, repodir, os.environ)
+    renderer = args.renderer
+    renderer_builddir = os.path.join(builddir, renderer)
+    renderer_repodir = os.path.join(repodir, renderer)
+    for d in (renderer_builddir, renderer_repodir):
+        os.makedirs(d, exist_ok=True)
+    failures = buildaddons(config, srcdir, renderer_builddir, renderer_repodir,
+                           renderer, os.environ)
     if failures:
         logger.error("Failed addons: %s", ", ".join(failures))
-        return 1
-    return 0
+        return
+    return
 
 
 if __name__ == "__main__":
-    sys.exit(main(sys.argv))
+    sys.exit(main(sys.argv[1:]))
