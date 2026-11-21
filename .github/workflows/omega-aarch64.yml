@@ -16,3 +16,4 @@ jobs:
     with:
       config_path: configs/Omega.json
       runner: ubuntu-24.04-arm
+      release_suffix: "-aarch64"

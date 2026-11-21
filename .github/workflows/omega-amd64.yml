@@ -16,3 +16,4 @@ jobs:
     with:
       config_path: configs/Omega.json
       runner: ubuntu-latest
+      release_suffix: "-amd64"

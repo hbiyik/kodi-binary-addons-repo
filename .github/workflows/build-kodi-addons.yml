@@ -12,6 +12,11 @@ on:
         required: false
         type: string
         default: "gl gles"
+      release_suffix:
+        description: "Optional suffix appended to the release name (e.g. '-amd64' or '-arm64')"
+        required: false
+        type: string
+        default: ""
       runner:
         description: "GitHub-hosted or self-hosted runner label"
         required: false
@@ -41,12 +46,13 @@ jobs:
           set -euo pipefail
 
           CONFIG_NAME="$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["name"])' "${{ inputs.config_path }}")"
+          RELEASE_SUFFIX="${{ inputs.release_suffix }}"
           REPO_ROOT="${CONFIG_NAME}/repo"
           REPO_SLUG="${GITHUB_REPOSITORY}"
 
           for renderer in ${{ inputs.renderers }}; do
             local_dir="${REPO_ROOT}/${renderer}"
-            release_name="${CONFIG_NAME}-${renderer}"
+            release_name="${CONFIG_NAME}-${renderer}${RELEASE_SUFFIX}"
             mkdir -p "${local_dir}"
 
             if ! gh release view "${release_name}" --repo "${REPO_SLUG}" >/dev/null 2>&1; then
@@ -80,12 +86,13 @@ jobs:
           set -euo pipefail
 
           CONFIG_NAME="$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["name"])' "${{ inputs.config_path }}")"
+          RELEASE_SUFFIX="${{ inputs.release_suffix }}"
           REPO_ROOT="${CONFIG_NAME}/repo"
           REPO_SLUG="${GITHUB_REPOSITORY}"
 
           for renderer in ${{ inputs.renderers }}; do
             local_dir="${REPO_ROOT}/${renderer}"
-            release_name="${CONFIG_NAME}-${renderer}"
+            release_name="${CONFIG_NAME}-${renderer}${RELEASE_SUFFIX}"
 
             if [ ! -d "${local_dir}" ]; then
               echo "Skipping ${renderer}: directory '${local_dir}' does not exist."
@@ -99,7 +106,7 @@ jobs:
               gh release create "${release_name}" \
                 --repo "${REPO_SLUG}" \
                 --title "${release_name}" \
-                --notes "Automated build artifacts for ${CONFIG_NAME} (${renderer})"
+                --notes "Automated build artifacts for ${CONFIG_NAME} (${renderer}${RELEASE_SUFFIX})"
 
               if [ "${#local_files[@]}" -gt 0 ]; then
                 file_paths=()
