@@ -1,0 +1,34 @@
+name: Build Omega Addons
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 */4 * * *"
+
+permissions:
+  contents: write
+
+jobs:
+  omega:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - renderer: gl
+            runner: ubuntu-latest
+            release_suffix: "-amd64"
+          - renderer: gles
+            runner: ubuntu-latest
+            release_suffix: "-amd64"
+          - renderer: gl
+            runner: ubuntu-24.04-arm
+            release_suffix: "-aarch64"
+          - renderer: gles
+            runner: ubuntu-24.04-arm
+            release_suffix: "-aarch64"
+    uses: ./.github/workflows/build-kodi-addons.yml
+    with:
+      config_path: configs/Omega.json
+      runner: ${{ matrix.runner }}
+      renderer: ${{ matrix.renderer }}
+      release_suffix: ${{ matrix.release_suffix }}
