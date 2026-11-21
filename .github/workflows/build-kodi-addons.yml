@@ -13,7 +13,7 @@ on:
         type: string
         default: "build.py"
       renderers:
-        description: "Space-separated list of renderers to sync"
+        description: "Space-separated list of renderers to build and sync"
         required: false
         type: string
         default: "gl gles"
@@ -39,6 +39,41 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.x"
+
+      - name: Download existing release artifacts to local repo folders
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          CONFIG_NAME="$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["name"])' "${{ inputs.config_path }}")"
+          REPO_ROOT="${CONFIG_NAME}/repo"
+          REPO_SLUG="${GITHUB_REPOSITORY}"
+
+          for renderer in ${{ inputs.renderers }}; do
+            local_dir="${REPO_ROOT}/${renderer}"
+            release_name="${CONFIG_NAME}-${renderer}"
+            mkdir -p "${local_dir}"
+
+            if ! gh release view "${release_name}" --repo "${REPO_SLUG}" >/dev/null 2>&1; then
+              echo "Release '${release_name}' does not exist yet; starting with empty '${local_dir}'."
+              continue
+            fi
+
+            asset_count="$(
+              gh api "repos/${REPO_SLUG}/releases/tags/${release_name}" \
+                --jq '.assets | length'
+            )"
+
+            if [ "${asset_count}" -gt 0 ]; then
+              echo "Downloading ${asset_count} asset(s) from '${release_name}' into '${local_dir}'..."
+              gh release download "${release_name}" \
+                --repo "${REPO_SLUG}" \
+                --dir "${local_dir}" \
+                --clobber
+            else
+              echo "Release '${release_name}' has no assets to download."
+            fi
+          done
 
       - name: Run build script
         run: |
