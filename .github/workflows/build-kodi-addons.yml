@@ -1,0 +1,112 @@
+name: Build and Sync Kodi Binary Addons
+
+on:
+  workflow_call:
+    inputs:
+      config_path:
+        description: "Path to the build JSON configuration file"
+        required: true
+        type: string
+      script_path:
+        description: "Path to build.py"
+        required: false
+        type: string
+        default: "build.py"
+      renderers:
+        description: "Space-separated list of renderers to sync"
+        required: false
+        type: string
+        default: "gl gles"
+      runner:
+        description: "GitHub-hosted or self-hosted runner label"
+        required: false
+        type: string
+        default: "ubuntu-latest"
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-sync:
+    runs-on: ${{ inputs.runner }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Run build script
+        run: |
+          python3 "${{ inputs.script_path }}" "${{ inputs.config_path }}"
+
+      - name: Sync release artifacts per renderer
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          CONFIG_NAME="$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["name"])' "${{ inputs.config_path }}")"
+          REPO_ROOT="${CONFIG_NAME}/repo"
+          REPO_SLUG="${GITHUB_REPOSITORY}"
+
+          for renderer in ${{ inputs.renderers }}; do
+            local_dir="${REPO_ROOT}/${renderer}"
+            release_name="${CONFIG_NAME}-${renderer}"
+
+            if [ ! -d "${local_dir}" ]; then
+              echo "Skipping ${renderer}: directory '${local_dir}' does not exist."
+              continue
+            fi
+
+            mapfile -t local_files < <(find "${local_dir}" -maxdepth 1 -type f -printf '%f\n' | sort)
+
+            if ! gh release view "${release_name}" --repo "${REPO_SLUG}" >/dev/null 2>&1; then
+              echo "Creating release '${release_name}'..."
+              gh release create "${release_name}" \
+                --repo "${REPO_SLUG}" \
+                --title "${release_name}" \
+                --notes "Automated build artifacts for ${CONFIG_NAME} (${renderer})"
+
+              if [ "${#local_files[@]}" -gt 0 ]; then
+                file_paths=()
+                for fname in "${local_files[@]}"; do
+                  file_paths+=("${local_dir}/${fname}")
+                done
+                gh release upload "${release_name}" "${file_paths[@]}" --repo "${REPO_SLUG}" --clobber
+              fi
+              continue
+            fi
+
+            echo "Syncing release '${release_name}' with '${local_dir}'..."
+
+            remote_assets="$(
+              gh api "repos/${REPO_SLUG}/releases/tags/${release_name}" \
+                --jq '.assets[] | "\(.id)\t\(.name)"'
+            )"
+
+            if [ -n "${remote_assets}" ]; then
+              while IFS=$'\t' read -r asset_id asset_name; do
+                [ -z "${asset_name}" ] && continue
+                if [ ! -f "${local_dir}/${asset_name}" ]; then
+                  echo "Deleting stale remote asset '${asset_name}' (id=${asset_id})..."
+                  gh api --method DELETE \
+                    "repos/${REPO_SLUG}/releases/assets/${asset_id}" >/dev/null
+                fi
+              done <<< "${remote_assets}"
+            fi
+
+            if [ "${#local_files[@]}" -gt 0 ]; then
+              file_paths=()
+              for fname in "${local_files[@]}"; do
+                file_paths+=("${local_dir}/${fname}")
+              done
+              echo "Uploading/updating ${#local_files[@]} artifact(s) to '${release_name}'..."
+              gh release upload "${release_name}" "${file_paths[@]}" --repo "${REPO_SLUG}" --clobber
+            else
+              echo "No local files in '${local_dir}' to upload."
+            fi
+          done

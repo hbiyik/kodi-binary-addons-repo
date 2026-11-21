@@ -143,9 +143,11 @@ def checkout(srcdir, name, url, ref, commit=None):
     old_count = count_commits()
     old_hash = old_hash[:GITHASHLEN]
 
-    # Works for branches, tags and (where the server allows it) commit hashes.
-    git("fetch", "-q", "origin", commit or ref)
-    git("reset", "-q", "--hard", "FETCH_HEAD")
+    git("fetch", "-q", "origin", ref)
+    if commit:
+        git("reset", "-q", "--hard", commit)
+    else:
+        git("reset", "-q", "--hard", "FETCH_HEAD")
 
     _, final_hash = git("rev-parse", "HEAD", capture=True)
     final_count = count_commits()
@@ -272,7 +274,7 @@ def updaterepoaddon(repodir, builddir, addonname, kodirev, kodihash, addonrev, a
     return packaged
 
 
-def buildaddon(srcdir, builddir, repodir, kodirev, kodihash, addon, env):
+def buildaddon(srcdir, builddir, repodir, kodirev, kodihash, addon, renderer, env):
     addonenv = env.copy()
     addonenv.update(addon.get("env", {}))
     addonname = addon["name"]
@@ -294,7 +296,7 @@ def buildaddon(srcdir, builddir, repodir, kodirev, kodihash, addon, env):
         f"-DADDONS_TO_BUILD={addonname}",
         f"-DADDON_SRC_PREFIX={srcdir}",
         "-DCMAKE_BUILD_TYPE=Release",
-        "-DAPP_RENDER_SYSTEM=gles",
+        f"-DAPP_RENDER_SYSTEM={renderer}",
         f"-DCMAKE_INSTALL_PREFIX={addon_builddir}/.install",
         "-DPACKAGE_ZIP=ON",
         "-Wno-dev",
@@ -312,7 +314,7 @@ def buildaddon(srcdir, builddir, repodir, kodirev, kodihash, addon, env):
     return BUILT, addonrev, addonhash
 
 
-def buildaddons(config, srcdir, builddir, repodir, env):
+def buildaddons(config, srcdir, builddir, repodir, renderer, env):
     kodihash, kodirev = checkout(srcdir, KODI, config[KODI]["url"], config[KODI]["ref"],
                                  config[KODI].get("commit"))
     kodienv = env.copy()
@@ -321,7 +323,7 @@ def buildaddons(config, srcdir, builddir, repodir, env):
     for addon in config[ADDONS]:
         name = addon["name"]
         state, addonrev, addonhash = buildaddon(
-            srcdir, builddir, repodir, kodirev, kodihash, addon, kodienv)
+            srcdir, builddir, repodir, kodirev, kodihash, addon, renderer, kodienv)
         if state == SKIPPED:
             continue
         if state == FAILED:
@@ -347,11 +349,18 @@ def main(argv):
     for d in (srcdir, builddir, repodir):
         os.makedirs(d, exist_ok=True)
 
-    failures = buildaddons(config, srcdir, builddir, repodir, os.environ)
-    if failures:
-        logger.error("Failed addons: %s", ", ".join(failures))
-        return 1
-    return 0
+    ret = 0
+    for renderer in ["gl", "gles"]:
+        renderer_builddir = os.path.join(builddir, renderer)
+        renderer_repodir = os.path.join(repodir, renderer)
+        for d in (renderer_builddir, renderer_repodir):
+            os.makedirs(d, exist_ok=True)
+        failures = buildaddons(config, srcdir, renderer_builddir, renderer_repodir,
+                               renderer, os.environ)
+        if failures:
+            logger.error("Failed addons: %s", ", ".join(failures))
+            ret = 1
+    return ret
 
 
 if __name__ == "__main__":
