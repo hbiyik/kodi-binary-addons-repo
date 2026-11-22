@@ -491,8 +491,8 @@ def main(argv):
                            renderer, os.environ)
     if failures:
         logger.error("Failed addons: %s", ", ".join(failures))
-        return 1
-    return 0
+        return
+    return
 
 
 if __name__ == "__main__":
