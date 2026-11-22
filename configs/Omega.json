@@ -353,11 +353,12 @@
       "url": "https://github.com/xbmc/screensaver.stars",
       "ref": "Omega"
     },
-    {
-      "name": "screensavers.rsxs",
-      "url": "https://github.com/xbmc/screensavers.rsxs",
-      "ref": "Omega"
-    },
+	{
+	  "name": "screensavers.rsxs",
+	  "subname": "screensaver.rsxs.flux",
+	  "url": "https://github.com/xbmc/screensavers.rsxs",
+	  "ref": "Omega"
+	},
     {
       "name": "vfs.libarchive",
       "url": "https://github.com/xbmc/vfs.libarchive",

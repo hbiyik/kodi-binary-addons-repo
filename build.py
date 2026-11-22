@@ -361,7 +361,7 @@ def buildaddon(srcdir, builddir, repodir, kodirev, kodihash, addon, renderer, en
     addonhash, addonrev = checkout(srcdir, addonname, addon["url"], addon["ref"], addon.get("commit"))
     newver = (kodirev, addonrev, kodihash, addonhash)
 
-    existing = existingversions(repodir, addonname)
+    existing = existingversions(repodir, addon.get("subname") or addonname)
     if newver in existing:
         logger.info("%s has no update, skipping", addonname)
         return SKIPPED, addonrev, addonhash
