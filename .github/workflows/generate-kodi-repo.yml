@@ -1,0 +1,127 @@
+name: Generate Kodi Repository Addon
+
+on:
+  workflow_call:
+    inputs:
+      release_suffix:
+        description: "Release/variant suffix including renderer and arch (e.g. '-gl-amd64' or '-gles-aarch64')"
+        required: true
+        type: string
+      repo_id:
+        description: "Repository add-on ID"
+        required: false
+        type: string
+        default: "repository.binaryaddons"
+      repo_name:
+        description: "Repository add-on display name"
+        required: false
+        type: string
+        default: "Kodi Binary Addons"
+      repo_version:
+        description: "Repository add-on version"
+        required: false
+        type: string
+        default: "0.0.1"
+      repos_release:
+        description: "GitHub release tag to upload the generated repository zip to"
+        required: false
+        type: string
+        default: "repos"
+      repo_roots:
+        description: "Newline-separated list of root specs as <url>[:<min_version>[:<max_version>]]"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  generate-repo:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.x"
+
+      - name: Generate and upload repository addon
+        shell: bash
+        env:
+          RELEASE_SUFFIX: ${{ inputs.release_suffix }}
+          REPO_ID: ${{ inputs.repo_id }}
+          REPO_NAME: ${{ inputs.repo_name }}
+          REPO_VERSION: ${{ inputs.repo_version }}
+          REPOS_RELEASE: ${{ inputs.repos_release }}
+          REPO_ROOTS: ${{ inputs.repo_roots }}
+        run: |
+          set -euo pipefail
+          REPO_SLUG="${GITHUB_REPOSITORY}"
+
+          out_dir="_repo_pkg"
+          rm -rf "${out_dir}"
+          mkdir -p "${out_dir}"
+
+          cmd=(
+            python3 repo.py "${out_dir}"
+            --id "${REPO_ID}"
+            --name "${REPO_NAME}"
+            --version "${REPO_VERSION}"
+          )
+
+          root_count=0
+          while IFS= read -r line; do
+            spec="$(printf '%s' "${line}" | xargs)"
+            [ -z "${spec}" ] && continue
+            cmd+=(--root "${spec}")
+            root_count=$((root_count + 1))
+          done <<< "${REPO_ROOTS}"
+
+          if [ "${root_count}" -eq 0 ]; then
+            echo "Error: repo_roots input is empty; provide at least one <url>[:<min_version>[:<max_version>]]." >&2
+            exit 1
+          fi
+
+          "${cmd[@]}"
+
+          generated_zip="${out_dir}/${REPO_ID}-${REPO_VERSION}.zip"
+          if [ ! -f "${generated_zip}" ]; then
+            echo "Error: expected generated archive '${generated_zip}' not found." >&2
+            exit 1
+          fi
+
+          clean_suffix="$(printf '%s' "${RELEASE_SUFFIX}" | xargs)"
+          if [ -z "${clean_suffix}" ]; then
+            target_zip="${out_dir}/${REPO_ID}.zip"
+          elif [[ "${clean_suffix}" == -* ]]; then
+            target_zip="${out_dir}/${REPO_ID}${clean_suffix}.zip"
+          else
+            target_zip="${out_dir}/${REPO_ID}-${clean_suffix}.zip"
+          fi
+          cp -f "${generated_zip}" "${target_zip}"
+
+          if ! gh release view "${REPOS_RELEASE}" --repo "${REPO_SLUG}" >/dev/null 2>&1; then
+            echo "Creating release '${REPOS_RELEASE}'..."
+            gh release create "${REPOS_RELEASE}" \
+              --repo "${REPO_SLUG}" \
+              --title "${REPOS_RELEASE}" \
+              --notes "Kodi repository add-on packages"
+          fi
+
+          echo "Uploading '${target_zip}' to release '${REPOS_RELEASE}'..."
+          gh release upload "${REPOS_RELEASE}" "${target_zip}" --repo "${REPO_SLUG}" --clobber
+
+          if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
+            {
+              echo "### Repository Package Sync: \`${REPOS_RELEASE}\`"
+              echo ""
+              echo "| Action | Asset |"
+              echo "| :--- | :--- |"
+              echo "| Uploaded | \`$(basename "${target_zip}")\` |"
+              echo ""
+            } >> "${GITHUB_STEP_SUMMARY}"
+          fi

@@ -1,0 +1,217 @@
+name: Build and Sync Kodi Binary Addons
+
+on:
+  workflow_call:
+    inputs:
+      config_path:
+        description: "Path to the build JSON configuration file"
+        required: true
+        type: string
+      renderer:
+        description: "Target renderer to build and sync (e.g. 'gl' or 'gles')"
+        required: false
+        type: string
+        default: "gl"
+      release_suffix:
+        description: "Optional suffix appended to the release name (e.g. '-amd64' or '-arm64')"
+        required: false
+        type: string
+        default: ""
+      runner:
+        description: "GitHub-hosted or self-hosted runner label"
+        required: false
+        type: string
+        default: "ubuntu-latest"
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-sync:
+    runs-on: ${{ inputs.runner }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.x"
+
+      - name: Install build dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y gettext autopoint autoconf automake libtool gperf libgl-dev libgles-dev libegl-dev nasm
+
+      - name: Download existing release artifacts to local repo folder
+        shell: bash
+        env:
+          CONFIG_PATH: ${{ inputs.config_path }}
+          RENDERER: ${{ inputs.renderer }}
+          RELEASE_SUFFIX: ${{ inputs.release_suffix }}
+        run: |
+          set -euo pipefail
+
+          CONFIG_NAME="$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["name"])' "${CONFIG_PATH}")"
+          local_dir="${CONFIG_NAME}/repo/${RENDERER}"
+          release_name="${CONFIG_NAME}-${RENDERER}${RELEASE_SUFFIX}"
+          REPO_SLUG="${GITHUB_REPOSITORY}"
+
+          mkdir -p "${local_dir}"
+
+          if ! gh release view "${release_name}" --repo "${REPO_SLUG}" >/dev/null 2>&1; then
+            echo "Release '${release_name}' does not exist yet; starting with empty '${local_dir}'."
+            exit 0
+          fi
+
+          asset_count="$(
+            gh api "repos/${REPO_SLUG}/releases/tags/${release_name}" \
+              --jq '.assets | length'
+          )"
+
+          if [ "${asset_count}" -gt 0 ]; then
+            echo "Downloading ${asset_count} asset(s) from '${release_name}' into '${local_dir}'..."
+            gh release download "${release_name}" \
+              --repo "${REPO_SLUG}" \
+              --dir "${local_dir}" \
+              --clobber
+          else
+            echo "Release '${release_name}' has no assets to download."
+          fi
+
+      - name: Run build script
+        shell: bash
+        env:
+          CONFIG_PATH: ${{ inputs.config_path }}
+          RENDERER: ${{ inputs.renderer }}
+        run: |
+          set -euo pipefail
+          python3 build.py "${CONFIG_PATH}" --renderer "${RENDERER}"
+
+      - name: Sync release artifacts
+        shell: bash
+        env:
+          CONFIG_PATH: ${{ inputs.config_path }}
+          RENDERER: ${{ inputs.renderer }}
+          RELEASE_SUFFIX: ${{ inputs.release_suffix }}
+        run: |
+          set -euo pipefail
+
+          CONFIG_NAME="$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["name"])' "${CONFIG_PATH}")"
+          local_dir="${CONFIG_NAME}/repo/${RENDERER}"
+          release_name="${CONFIG_NAME}-${RENDERER}${RELEASE_SUFFIX}"
+          REPO_SLUG="${GITHUB_REPOSITORY}"
+
+          summary_rows=()
+          record_sync() {
+            local action="$1"
+            local fname="$2"
+            local safe_action="${action//'|'/'\|'}"
+            local safe_fname="${fname//'|'/'\|'}"
+            summary_rows+=("| ${safe_action} | \`${safe_fname}\` |")
+          }
+
+          flush_summary() {
+            [ -z "${GITHUB_STEP_SUMMARY:-}" ] && return 0
+            {
+              echo "### Release Sync: \`${release_name}\`"
+              echo ""
+              if [ "${#summary_rows[@]}" -eq 0 ]; then
+                echo "No release asset changes (${#local_files[@]} file(s) unchanged)."
+              else
+                echo "| Action | Asset |"
+                echo "| :--- | :--- |"
+                for row in "${summary_rows[@]}"; do
+                  echo "${row}"
+                done
+              fi
+              echo ""
+            } >> "${GITHUB_STEP_SUMMARY}"
+          }
+
+          if [ ! -d "${local_dir}" ]; then
+            echo "Skipping ${RENDERER}: directory '${local_dir}' does not exist."
+            local_files=()
+            flush_summary
+            exit 0
+          fi
+
+          mapfile -t local_files < <(find "${local_dir}" -maxdepth 1 -type f -printf '%f\n' | sort)
+
+          if ! gh release view "${release_name}" --repo "${REPO_SLUG}" >/dev/null 2>&1; then
+            echo "Creating release '${release_name}'..."
+            gh release create "${release_name}" \
+              --repo "${REPO_SLUG}" \
+              --title "${release_name}" \
+              --notes "Automated build artifacts for ${CONFIG_NAME} (${RENDERER}${RELEASE_SUFFIX})"
+
+            if [ "${#local_files[@]}" -gt 0 ]; then
+              file_paths=()
+              for fname in "${local_files[@]}"; do
+                file_paths+=("${local_dir}/${fname}")
+              done
+              gh release upload "${release_name}" "${file_paths[@]}" --repo "${REPO_SLUG}" --clobber
+              for fname in "${local_files[@]}"; do
+                record_sync "Uploaded" "${fname}"
+              done
+            fi
+            flush_summary
+            exit 0
+          fi
+
+          echo "Syncing release '${release_name}' with '${local_dir}'..."
+
+          remote_assets="$(
+            gh api "repos/${REPO_SLUG}/releases/tags/${release_name}" \
+              --jq '.assets[] | "\(.id)\t\(.name)\t\(.digest // "")"'
+          )"
+
+          unset remote_map || true
+          declare -A remote_map=()
+
+          if [ -n "${remote_assets}" ]; then
+            while IFS=$'\t' read -r asset_id asset_name asset_digest; do
+              [ -z "${asset_name}" ] && continue
+              if [ ! -f "${local_dir}/${asset_name}" ]; then
+                echo "Deleting stale remote asset '${asset_name}' (id=${asset_id})..."
+                gh api --method DELETE \
+                  "repos/${REPO_SLUG}/releases/assets/${asset_id}" >/dev/null
+                record_sync "Deleted" "${asset_name}"
+              else
+                remote_map["${asset_name}"]="${asset_id}"$'\t'"${asset_digest}"
+              fi
+            done <<< "${remote_assets}"
+          fi
+
+          files_to_sync=()
+          for fname in "${local_files[@]}"; do
+            fpath="${local_dir}/${fname}"
+            local_sha="sha256:$(sha256sum "${fpath}" | awk '{print $1}')"
+
+            if [[ -v "remote_map[${fname}]" ]]; then
+              remote_entry="${remote_map[${fname}]}"
+              remote_digest="${remote_entry#*$'\t'}"
+              if [ -n "${remote_digest}" ] && [ "${remote_digest}" = "${local_sha}" ]; then
+                echo "Unchanged '${fname}' (${local_sha}); skipping upload."
+                continue
+              fi
+              files_to_sync+=("${fpath}")
+              record_sync "Updated" "${fname}"
+            else
+              files_to_sync+=("${fpath}")
+              record_sync "Uploaded" "${fname}"
+            fi
+          done
+
+          if [ "${#files_to_sync[@]}" -gt 0 ]; then
+            echo "Uploading/updating ${#files_to_sync[@]} changed/new artifact(s) to '${release_name}'..."
+            gh release upload "${release_name}" "${files_to_sync[@]}" --repo "${REPO_SLUG}" --clobber
+          else
+            echo "All ${#local_files[@]} artifact(s) in '${local_dir}' already match remote release; nothing to upload."
+          fi
+
+          flush_summary

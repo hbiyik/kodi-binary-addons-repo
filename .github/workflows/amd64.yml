@@ -1,0 +1,48 @@
+name: Build amd64 Addons
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 */4 * * *"
+
+permissions:
+  contents: write
+
+jobs:
+  addons:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - renderer: gl
+            config_path: configs/Omega.json
+          - renderer: gles
+            config_path: configs/Omega.json
+          - renderer: gl
+            config_path: configs/Piers.json
+          - renderer: gles
+            config_path: configs/Piers.json
+    uses: ./.github/workflows/build-kodi-addons.yml
+    with:
+      runner: ubuntu-latest
+      config_path: ${{ matrix.config_path }}
+      renderer: ${{ matrix.renderer }}
+      release_suffix: "-amd64"
+
+  generate-repo-gl-amd64:
+    needs: addons
+    uses: ./.github/workflows/generate-kodi-repo.yml
+    with:
+      release_suffix: "-gl-amd64"
+      repo_roots: |
+        https://kodi-binary-addons-repo.boogiepop.workers.dev/Omega-gl-amd64:21.0.0:21.99.99
+        https://kodi-binary-addons-repo.boogiepop.workers.dev/Piers-gl-amd64:22.0.0:22.99.99
+
+  generate-repo-gles-amd64:
+    needs: addons
+    uses: ./.github/workflows/generate-kodi-repo.yml
+    with:
+      release_suffix: "-gles-amd64"
+      repo_roots: |
+        https://kodi-binary-addons-repo.boogiepop.workers.dev/Omega-gles-amd64:21.0.0:21.99.99
+        https://kodi-binary-addons-repo.boogiepop.workers.dev/Piers-gles-amd64:22.0.0:22.99.99

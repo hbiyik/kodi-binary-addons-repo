@@ -1,0 +1,417 @@
+{
+  "name": "Piers",
+  "kodi": {
+    "url": "https://github.com/xbmc/xbmc.git",
+    "ref": "Piers",
+	"commit": "a14078b7a0d08d64aa9d861734ca9c4330bc9340",
+	"env": {"CMAKE_POLICY_VERSION_MINIMUM": "3.5"}
+  },
+  "addons": [
+    {
+      "name": "audiodecoder.2sf",
+      "url": "https://github.com/xbmc/audiodecoder.2sf",
+      "ref": "Piers"
+    },
+    {
+      "name": "audiodecoder.asap",
+      "url": "https://github.com/xbmc/audiodecoder.asap",
+      "ref": "Piers"
+    },
+    {
+      "name": "audiodecoder.gme",
+      "url": "https://github.com/xbmc/audiodecoder.gme",
+      "ref": "Piers"
+    },
+    {
+      "name": "audiodecoder.gsf",
+      "url": "https://github.com/xbmc/audiodecoder.gsf",
+      "ref": "Piers"
+    },
+    {
+      "name": "audiodecoder.hvl",
+      "url": "https://github.com/xbmc/audiodecoder.hvl",
+      "ref": "Piers"
+    },
+    {
+      "name": "audiodecoder.modplug",
+      "url": "https://github.com/xbmc/audiodecoder.modplug",
+      "ref": "Piers"
+    },
+    {
+      "name": "audiodecoder.ncsf",
+      "url": "https://github.com/xbmc/audiodecoder.ncsf",
+      "ref": "Piers"
+    },
+    {
+      "name": "audiodecoder.nosefart",
+      "url": "https://github.com/xbmc/audiodecoder.nosefart",
+      "ref": "Piers"
+    },
+    {
+      "name": "audiodecoder.openmpt",
+      "url": "https://github.com/xbmc/audiodecoder.openmpt",
+      "ref": "Piers"
+    },
+    {
+      "name": "audiodecoder.organya",
+      "url": "https://github.com/xbmc/audiodecoder.organya",
+      "ref": "Piers"
+    },
+    {
+      "name": "audiodecoder.qsf",
+      "url": "https://github.com/xbmc/audiodecoder.qsf",
+      "ref": "Piers"
+    },
+    {
+      "name": "audiodecoder.sacd",
+      "url": "https://github.com/xbmc/audiodecoder.sacd",
+      "ref": "Piers"
+    },
+    {
+      "name": "audiodecoder.sidplay",
+      "url": "https://github.com/xbmc/audiodecoder.sidplay",
+      "ref": "Piers"
+    },
+    {
+      "name": "audiodecoder.snesapu",
+      "url": "https://github.com/xbmc/audiodecoder.snesapu",
+      "ref": "Piers"
+    },
+    {
+      "name": "audiodecoder.ssf",
+      "url": "https://github.com/xbmc/audiodecoder.ssf",
+      "ref": "Piers"
+    },
+    {
+      "name": "audiodecoder.stsound",
+      "url": "https://github.com/xbmc/audiodecoder.stsound",
+      "ref": "Piers"
+    },
+    {
+      "name": "audiodecoder.timidity",
+      "url": "https://github.com/xbmc/audiodecoder.timidity",
+      "ref": "Piers"
+    },
+    {
+      "name": "audiodecoder.upse",
+      "url": "https://github.com/xbmc/audiodecoder.upse",
+      "ref": "Piers"
+    },
+    {
+      "name": "audiodecoder.usf",
+      "url": "https://github.com/xbmc/audiodecoder.usf",
+      "ref": "Piers"
+    },
+    {
+      "name": "audiodecoder.vgmstream",
+      "url": "https://github.com/xbmc/audiodecoder.vgmstream",
+      "ref": "Piers"
+    },
+    {
+      "name": "audiodecoder.wsr",
+      "url": "https://github.com/xbmc/audiodecoder.wsr",
+      "ref": "Piers"
+    },
+    {
+      "name": "audioencoder.flac",
+      "url": "https://github.com/xbmc/audioencoder.flac",
+      "ref": "Piers"
+    },
+    {
+      "name": "audioencoder.lame",
+      "url": "https://github.com/xbmc/audioencoder.lame",
+      "ref": "Piers"
+    },
+    {
+      "name": "audioencoder.vorbis",
+      "url": "https://github.com/xbmc/audioencoder.vorbis",
+      "ref": "Piers"
+    },
+    {
+      "name": "audioencoder.wav",
+      "url": "https://github.com/xbmc/audioencoder.wav",
+      "ref": "Piers"
+    },
+    {
+      "name": "game.libretro.2048",
+      "url": "https://github.com/kodi-game/game.libretro.2048",
+      "ref": "master"
+    },
+    {
+      "name": "game.libretro",
+      "url": "https://github.com/kodi-game/game.libretro",
+      "ref": "Piers"
+    },
+    {
+      "name": "imagedecoder.heif",
+      "url": "https://github.com/xbmc/imagedecoder.heif",
+      "ref": "Piers"
+    },
+    {
+      "name": "imagedecoder.mpo",
+      "url": "https://github.com/xbmc/imagedecoder.mpo",
+      "ref": "Piers"
+    },
+    {
+      "name": "imagedecoder.raw",
+      "url": "https://github.com/xbmc/imagedecoder.raw",
+      "ref": "Piers"
+    },
+    {
+      "name": "inputstream.adaptive",
+      "url": "https://github.com/xbmc/inputstream.adaptive",
+      "ref": "Piers"
+    },
+    {
+      "name": "inputstream.ffmpegdirect",
+      "url": "https://github.com/xbmc/inputstream.ffmpegdirect",
+      "ref": "Piers"
+    },
+    {
+      "name": "inputstream.rtmp",
+      "url": "https://github.com/xbmc/inputstream.rtmp",
+      "ref": "Piers"
+    },
+    {
+      "name": "peripheral.joystick",
+      "url": "https://github.com/xbmc/peripheral.joystick",
+      "ref": "Piers"
+    },
+    {
+      "name": "peripheral.xarcade",
+      "url": "https://github.com/kodi-game/peripheral.xarcade",
+      "ref": "Piers"
+    },
+    {
+      "name": "pvr.argustv",
+      "url": "https://github.com/kodi-pvr/pvr.argustv",
+      "ref": "Piers"
+    },
+    {
+      "name": "pvr.dvblink",
+      "url": "https://github.com/kodi-pvr/pvr.dvblink",
+      "ref": "Piers"
+    },
+    {
+      "name": "pvr.dvbviewer",
+      "url": "https://github.com/kodi-pvr/pvr.dvbviewer",
+      "ref": "Piers"
+    },
+    {
+      "name": "pvr.filmon",
+      "url": "https://github.com/kodi-pvr/pvr.filmon",
+      "ref": "Piers"
+    },
+    {
+      "name": "pvr.freebox",
+      "url": "https://github.com/aassif/pvr.freebox",
+      "ref": "Piers"
+    },
+    {
+      "name": "pvr.hdhomerun",
+      "url": "https://github.com/kodi-pvr/pvr.hdhomerun",
+      "ref": "Piers"
+    },
+    {
+      "name": "pvr.hts",
+      "url": "https://github.com/kodi-pvr/pvr.hts",
+      "ref": "Piers"
+    },
+    {
+      "name": "pvr.iptvsimple",
+      "url": "https://github.com/kodi-pvr/pvr.iptvsimple",
+      "ref": "Piers"
+    },
+    {
+      "name": "pvr.mediaportal.tvserver",
+      "url": "https://github.com/kodi-pvr/pvr.mediaportal.tvserver",
+      "ref": "Piers"
+    },
+    {
+      "name": "pvr.mythtv",
+      "url": "https://github.com/janbar/pvr.mythtv",
+      "ref": "Piers"
+    },
+    {
+      "name": "pvr.nextpvr",
+      "url": "https://github.com/kodi-pvr/pvr.nextpvr",
+      "ref": "Piers"
+    },
+    {
+      "name": "pvr.njoy",
+      "url": "https://github.com/kodi-pvr/pvr.njoy",
+      "ref": "Piers"
+    },
+    {
+      "name": "pvr.octonet",
+      "url": "https://github.com/DigitalDevices/pvr.octonet",
+      "ref": "Piers"
+    },
+    {
+      "name": "pvr.pctv",
+      "url": "https://github.com/kodi-pvr/pvr.pctv",
+      "ref": "Piers"
+    },
+    {
+      "name": "pvr.plutotv",
+      "url": "https://github.com/kodi-pvr/pvr.plutotv",
+      "ref": "Piers"
+    },
+    {
+      "name": "pvr.sledovanitv.cz",
+      "url": "https://github.com/palinek/pvr.sledovanitv.cz",
+      "ref": "Piers"
+    },
+    {
+      "name": "pvr.stalker",
+      "url": "https://github.com/kodi-pvr/pvr.stalker",
+      "ref": "Piers"
+    },
+    {
+      "name": "pvr.teleboy",
+      "url": "https://github.com/rbuehlma/pvr.teleboy",
+      "ref": "Piers"
+    },
+    {
+      "name": "pvr.vbox",
+      "url": "https://github.com/kodi-pvr/pvr.vbox",
+      "ref": "Piers"
+    },
+    {
+      "name": "pvr.vdr.vnsi",
+      "url": "https://github.com/kodi-pvr/pvr.vdr.vnsi",
+      "ref": "Piers"
+    },
+    {
+      "name": "pvr.vuplus",
+      "url": "https://github.com/kodi-pvr/pvr.vuplus",
+      "ref": "Piers"
+    },
+    {
+      "name": "pvr.waipu",
+      "url": "https://github.com/flubshi/pvr.waipu",
+      "ref": "Piers"
+    },
+    {
+      "name": "pvr.wmc",
+      "url": "https://github.com/kodi-pvr/pvr.wmc",
+      "ref": "Piers"
+    },
+    {
+      "name": "screensaver.asteroids",
+      "url": "https://github.com/xbmc/screensaver.asteroids",
+      "ref": "Piers"
+    },
+    {
+      "name": "screensaver.asterwave",
+      "url": "https://github.com/xbmc/screensaver.asterwave",
+      "ref": "Piers"
+    },
+    {
+      "name": "screensaver.biogenesis",
+      "url": "https://github.com/xbmc/screensaver.biogenesis",
+      "ref": "Piers"
+    },
+    {
+      "name": "screensaver.cpblobs",
+      "url": "https://github.com/xbmc/screensaver.cpblobs",
+      "ref": "Piers"
+    },
+    {
+      "name": "screensaver.greynetic",
+      "url": "https://github.com/xbmc/screensaver.greynetic",
+      "ref": "Piers"
+    },
+    {
+      "name": "screensaver.matrixtrails",
+      "url": "https://github.com/xbmc/screensaver.matrixtrails",
+      "ref": "Piers"
+    },
+    {
+      "name": "screensaver.pingpong",
+      "url": "https://github.com/xbmc/screensaver.pingpong",
+      "ref": "Piers"
+    },
+    {
+      "name": "screensaver.pyro",
+      "url": "https://github.com/xbmc/screensaver.pyro",
+      "ref": "Piers"
+    },
+    {
+      "name": "screensaver.shadertoy",
+      "url": "https://github.com/xbmc/screensaver.shadertoy",
+      "ref": "Piers"
+    },
+    {
+      "name": "screensaver.stars",
+      "url": "https://github.com/xbmc/screensaver.stars",
+      "ref": "Piers"
+    },
+    {
+      "name": "screensavers.rsxs",
+      "subname": "screensaver.rsxs.flux",
+      "url": "https://github.com/xbmc/screensavers.rsxs",
+      "ref": "Piers"
+    },
+    {
+      "name": "vfs.libarchive",
+      "url": "https://github.com/xbmc/vfs.libarchive",
+      "ref": "Piers"
+    },
+    {
+      "name": "vfs.rar",
+      "url": "https://github.com/xbmc/vfs.rar",
+      "ref": "Piers"
+    },
+    {
+      "name": "vfs.sftp",
+      "url": "https://github.com/xbmc/vfs.sftp",
+      "ref": "Piers"
+    },
+    {
+      "name": "visualization.fishbmc",
+      "url": "https://github.com/xbmc/visualization.fishbmc",
+      "ref": "Piers"
+    },
+    {
+      "name": "visualization.goom",
+      "url": "https://github.com/xbmc/visualization.goom",
+      "ref": "Piers"
+    },
+    {
+      "name": "visualization.matrix",
+      "url": "https://github.com/xbmc/visualization.matrix",
+      "ref": "Piers"
+    },
+    {
+      "name": "visualization.pictureit",
+      "url": "https://github.com/xbmc/visualization.pictureit",
+      "ref": "Piers"
+    },
+    {
+      "name": "visualization.projectm",
+      "url": "https://github.com/xbmc/visualization.projectm",
+      "ref": "Piers"
+    },
+    {
+      "name": "visualization.shadertoy",
+      "url": "https://github.com/xbmc/visualization.shadertoy",
+      "ref": "Piers"
+    },
+    {
+      "name": "visualization.spectrum",
+      "url": "https://github.com/xbmc/visualization.spectrum",
+      "ref": "Piers"
+    },
+    {
+      "name": "visualization.starburst",
+      "url": "https://github.com/xbmc/visualization.starburst",
+      "ref": "Piers"
+    },
+    {
+      "name": "visualization.waveform",
+      "url": "https://github.com/xbmc/visualization.waveform",
+      "ref": "Piers"
+    }
+  ]
+}
